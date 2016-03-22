@@ -1,13 +1,12 @@
 'use strict';
 
-var ROUTER = require('express')();
+var COLLECTOR = require('express')();
 var http = require('http');
-var xml2js = require('xml2js');
-var parser = new xml2js.Parser();
+var parseString = require('xml2js').parseString;
 var bunyan = require('bunyan');
 
 var log = bunyan.createLogger({
-  name: 'ODC-EIDA Dataselect Router',
+  name: 'ODC-EIDA Dataselect Collector',
   streams: [{
     level: 'info',
     stream: process.stdout
@@ -19,12 +18,12 @@ var log = bunyan.createLogger({
 
 // Some server settings
 var SERVICE = {
-  'NAME': 'ODC-WFCATALOG-ROUTER',
+  'NAME': 'ODC-WFCATALOG-COLLECTOR',
   'HOST': '127.0.0.1',
   'PORT': 3002
 }
 
-ROUTER.get('/router', function(req, res, next) {
+COLLECTOR.get('/router', function(req, res, next) {
  
   req.service = {
     id: generateRequestID()
@@ -89,7 +88,7 @@ ROUTER.get('/router', function(req, res, next) {
       }
 
       // Parse the routingXML from GFZ
-      parser.parseString(body, function(err, result) {
+      parseString(body, function(err, result) {
 
         // Set up a container for the requests
         var requests = new Array();
@@ -137,7 +136,7 @@ function parseUrl(url) {
 
 }
 
-ROUTER.get('/router', function(req, res, next) {
+COLLECTOR.get('/router', function(req, res, next) {
 
   // Options
   var FDSN_REQUEST_TIMEOUT = 30000;
@@ -282,7 +281,7 @@ ROUTER.get('/router', function(req, res, next) {
 });
 
 // Start the HTTP server
-ROUTER.listen(SERVICE.PORT, SERVICE.HOST, function() {
+COLLECTOR.listen(SERVICE.PORT, SERVICE.HOST, function() {
   console.log(SERVICE.NAME + ' Webservice has been started on: ' + SERVICE.HOST + ":" + SERVICE.PORT);
 });
 

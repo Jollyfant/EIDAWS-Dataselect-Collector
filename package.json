@@ -1,0 +1,29 @@
+{
+  "name": "EIDAWS-Dataselect-Collector",
+  "version": "0.0.0",
+  "description": "NodeJS dataselect collector for multiple EIDA nodes routed by GFZ.",
+  "main": "server.js",
+  "dependencies": {
+    "bunyan": "~1.8.0",
+    "express": "~4.13.4",
+    "xml2js": "~0.4.16"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Jollyfant/EIDAWS-Dataselect-Collector.git"
+  },
+  "keywords": [
+    "EIDA",
+    "dataselect",
+    "collector"
+  ],
+  "author": "Mathijs Koymans",
+  "license": "BSD",
+  "bugs": {
+    "url": "https://github.com/Jollyfant/EIDAWS-Dataselect-Collector/issues"
+  }
+}
