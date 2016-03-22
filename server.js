@@ -35,6 +35,7 @@ COLLECTOR.get('/router', function(req, res, next) {
       'code': res.statusCode,
       'method': req.method,
       'id': req.service.id,
+      'nBytes': req.service.nBytesTotal,
     }, "request ended");
   });
 
@@ -197,6 +198,7 @@ COLLECTOR.get('/router', function(req, res, next) {
 
       log.info({
         id: req.service.id,
+        thread: i,
         queryTime: queryTime
       }, "thread request first response");
 
@@ -265,11 +267,14 @@ COLLECTOR.get('/router', function(req, res, next) {
         return res.status(204).end();
       }
 
+      var nBytesTotal = fullBuffer.length;
+      req.service.nBytesTotal = nBytesTotal;
+
       log.info({
         id: req.service.id,
-        nBytes: fullBuffer.length,
+        nBytes: nBytesTotal,
         totalRetrievalTime: (new Date() - requestStart), 
-      }, "routing completed");
+      }, "threads pooled");
 
       res.setHeader('Content-Type', 'application/vnd.fdsn.mseed');
       return res.status(200).send(fullBuffer);
