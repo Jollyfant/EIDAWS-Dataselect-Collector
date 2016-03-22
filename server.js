@@ -12,13 +12,13 @@ var log = bunyan.createLogger({
     stream: process.stdout
   }, {
     level: 'info',
-    path: './log'
+    path: './logs/ODC-DATASELECT-COLLECTOR.log'
   }]
 });
 
 // Some server settings
 var SERVICE = {
-  'NAME': 'ODC-WFCATALOG-COLLECTOR',
+  'NAME': 'ODC-DATASELECT-COLLECTOR',
   'HOST': '127.0.0.1',
   'PORT': 3002
 }
