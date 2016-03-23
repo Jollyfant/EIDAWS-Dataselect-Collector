@@ -1,3 +1,14 @@
+/*
+ * EIDAWS-Dataselect-Collector
+ * NodeJS dataselect collector for multiple EIDA nodes routed by GFZ.
+ *
+ * Written by:
+ *   Mathijs Koymans (koymans@knmi.nl)
+ *   Jollyfant @ GitHub
+ * 
+ * 23th of Match, 2016
+ */
+
 'use strict';
 
 var COLLECTOR = require('express')();
@@ -16,7 +27,7 @@ var log = bunyan.createLogger({
   }]
 });
 
-// Some server settings
+// Some server settings, to be moved to a cfg file
 var SERVICE = {
   'NAME': 'ODC-DATASELECT-COLLECTOR',
   'HOST': '127.0.0.1',
@@ -39,9 +50,9 @@ COLLECTOR.get('/router', function(req, res, next) {
     }, "request ended");
   });
 
-  // Set the default response timeout to 2 minutes
-  // Scraping requests will timeout in 30 seconds
-  res.setTimeout(2 * 60 * 1000);
+  // Disable timeout of server for long requests
+  // Collector requests will timeout in 30 seconds anyway
+  res.setTimeout(0);
 
   // Attempt to sanitize the dates
   var starttime = Date.parse(req.query.start);
@@ -108,10 +119,17 @@ COLLECTOR.get('/router', function(req, res, next) {
 
         }
 
+        // Shuffle the order of the requests randomly so we spread
+        // the load more evenly through time across nodes
+        requests.sort(function(a, b) {
+          return Math.random() < 0.5; 
+        });
+
         req.routedRequests = requests;
 
         log.info({
           id: req.service.id,
+          nRequests: req.routedRequests.length,
           retrievalTime: (new Date() - req.service.routingRequestStart), 
         }, "routing request succesful");
 
@@ -119,11 +137,13 @@ COLLECTOR.get('/router', function(req, res, next) {
 
       });
     });
-  }).end();
-  
+  }).end();  
 
 });
 
+/* function parseUrl
+ * separates host and path from an url
+ */
 function parseUrl(url) {
 
   var host = url.split("http://")[1];
@@ -146,6 +166,7 @@ COLLECTOR.get('/router', function(req, res, next) {
   var requestCounter = 0;
   var fullBuffer;
   var requestStart = new Date();
+  var queryTime;
   var threads = new Array();
   var nThreads = Math.min(NUMBER_OF_THREADS, req.routedRequests.length);
   var queryTime;
@@ -157,11 +178,11 @@ COLLECTOR.get('/router', function(req, res, next) {
 
   // Open the specificied number of threads to make requests
   for(var i = 0; i < nThreads; i++) {
-    threads.push(true);
+    threads.push(false);
     getRequest(i);
   }
 
-  // Create a request and set the thread activity to true
+  // Create a request and set the thread to false
   function getRequest(i) {
 
     var start = new Date();
@@ -169,29 +190,30 @@ COLLECTOR.get('/router', function(req, res, next) {
 
     // Handle one of the requested URLs
     var requestedUrl = req.routedRequests.pop();
-    if(!requestedUrl) return;
+    if(!requestedUrl) { 
+      return;
+    }
+
+    var url = parseUrl(requestedUrl);
 
     requestCounter++;
 
-    // Parse the URL returned by the routing service to a host & path
-    var url = parseUrl(requestedUrl);
-
-    // Request options
     log.info({
       id: req.service.id,
       thread: i,
       requested: url.host
     }, "thread requesting data");
 
+
+    // Parse the URL returned by the routing service to a host & path
     var options = {
       host: url.host,
       path: url.path,
       method: 'GET'
     }
 
-    var tempBuffer;
-
     // Start the GET request to a webservice
+    var requestBuffer;
     var reqqie = http.get(options, function(response) {
 
       queryTime = (new Date() - start); 
@@ -199,7 +221,8 @@ COLLECTOR.get('/router', function(req, res, next) {
       log.info({
         id: req.service.id,
         thread: i,
-        queryTime: queryTime
+        queryTime: queryTime,
+        requested: url.host
       }, "thread request first response");
 
       // Clear the custom timeout set on aborting the request
@@ -208,23 +231,24 @@ COLLECTOR.get('/router', function(req, res, next) {
       // When data is returned, pass it to a temporary buffer
       response.on('data', function(data) {
         if(response.statusCode === 200) {
-          tempBuffer = !tempBuffer ? new Buffer(data) : Buffer.concat([tempBuffer, new Buffer(data)])
+          requestBuffer = !requestBuffer ? new Buffer(data) : Buffer.concat([requestBuffer, new Buffer(data)])
         }
       });
 
-      // Concatenate the full response to the buffer
+      // Concatenate the response to the full buffer
       response.on('end', function(data) {
 
         log.info({
           id: req.service.id,
           thread: i,
           code: response.statusCode,
-          nBytes: tempBuffer ? tempBuffer.length : 0,
+          requested: url.host,
+          nBytes: requestBuffer ? requestBuffer.length : 0,
           retrievalTime: (new Date() - start)
         }, "thread request ended");
 
         if(response.statusCode === 200) {
-          fullBuffer = fullBuffer ? Buffer.concat([fullBuffer, tempBuffer]) : tempBuffer;
+          fullBuffer = fullBuffer ? Buffer.concat([fullBuffer, requestBuffer]) : requestBuffer;
         }
 
         threadFinished(i);
@@ -248,6 +272,7 @@ COLLECTOR.get('/router', function(req, res, next) {
     }, FDSN_REQUEST_TIMEOUT);
 
 
+    // When a thread is finished with its request
     function threadFinished(i) {
 
       threads[i] = true;
@@ -277,7 +302,7 @@ COLLECTOR.get('/router', function(req, res, next) {
       }, "threads pooled");
 
       res.setHeader('Content-Type', 'application/vnd.fdsn.mseed');
-      return res.status(200).send(fullBuffer);
+      res.status(200).send(fullBuffer);
 
     }
 
